@@ -1,0 +1,19 @@
+[project]
+name = "arxiv-project"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "arxiv>=3.0.0",
+    "dotenv>=0.9.9",
+    "fastembed>=0.7.4",
+    "jupyter>=1.1.1",
+    "numpy>=2.4.4",
+    "openai>=2.32.0",
+    "pandas>=3.0.2",
+    "qdrant-client[fastembed]>=1.14.2",
+    "rich>=15.0.0",
+    "tenacity>=9.1.4",
+    "xmltodict>=1.0.4",
+]
