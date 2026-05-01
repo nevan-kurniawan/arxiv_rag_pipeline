@@ -1,0 +1,8 @@
+from pathlib import Path
+
+ROOT = Path(__file__).parent
+
+DATA_DIR = ROOT / "data"
+RAW_DATA = DATA_DIR / "raw"
+GROUND_TRUTH_DIR = DATA_DIR / "ground_truth"
+EVAL_DIR = DATA_DIR / "evaluation"
