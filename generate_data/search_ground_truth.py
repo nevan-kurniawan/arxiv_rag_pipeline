@@ -28,23 +28,23 @@ def build_prompt(data:dict):
     prompt = prompt_template.format(**data)
     return prompt
 
-def generate_data(data, llm_client):
+def generate_data(data, llm_client, output_path = config.GROUND_TRUTH_DIR / 'ground-truth-data.csv'):
     processed_ids = set()
 
-    if os.path.exists(config.GROUND_TRUTH_DIR / 'ground-truth-data.csv'):
-        df = pd.read_csv(config.GROUND_TRUTH_DIR / 'ground-truth-data.csv')
+    if os.path.exists(output_path):
+        df = pd.read_csv(output_path)
         counts = df['entry_id'].value_counts()
         valid_ids = counts[counts == 5].index
         df_cleaned = df[df['entry_id'].isin(valid_ids)]
-        df_cleaned.to_csv(config.GROUND_TRUTH_DIR / 'ground-truth-data.csv', index=False)
+        df_cleaned.to_csv(output_path, index=False)
 
-    if os.path.exists(config.GROUND_TRUTH_DIR / 'ground-truth-data.csv'):
-        existing_df = pd.read_csv(config.GROUND_TRUTH_DIR / 'ground-truth-data.csv')
+    if os.path.exists(output_path):
+        existing_df = pd.read_csv(output_path)
         processed_ids = set(existing_df['entry_id'])
 
-    if os.path.exists(config.GROUND_TRUTH_DIR / 'failed-data.csv'):
-        existing_failed_df = pd.read_csv(config.GROUND_TRUTH_DIR / 'failed-data.csv')
-        processed_ids.update(existing_failed_df['entry_id'])
+    # if os.path.exists(config.GROUND_TRUTH_DIR / 'failed-data.csv'):
+    #     existing_failed_df = pd.read_csv(config.GROUND_TRUTH_DIR / 'failed-data.csv')
+    #     processed_ids.update(existing_failed_df['entry_id'])
     
     for entry in tqdm(data):
         if entry['entry_id'] in processed_ids:
@@ -60,22 +60,22 @@ def generate_data(data, llm_client):
             raw_questions = json.loads(json_response)
             current_batch = [(question, entry['entry_id'], generated_at) for question in raw_questions]
             temp_df = pd.DataFrame(current_batch, columns=['question', 'entry_id', 'generated_at'])
-            file_exists = os.path.exists(config.GROUND_TRUTH_DIR / 'ground-truth-data.csv')
-            temp_df.to_csv(config.GROUND_TRUTH_DIR / 'ground-truth-data.csv', index=False, mode='a', header=not file_exists)
+            file_exists = os.path.exists(output_path)
+            temp_df.to_csv(output_path, index=False, mode='a', header=not file_exists)
 
         except json.JSONDecodeError as e:
             print(f'Error parsing JSON! {e.msg} at line {e.lineno}, column {e.colno}. Skipped.')
-            err_batch = [(json_response, entry['entry_id'], generated_at, e)]
-            err_df = pd.DataFrame(err_batch, columns=['raw_response', 'entry_id', 'generated_at', 'exception'])
-            failed_exists = os.path.exists(config.GROUND_TRUTH_DIR / 'failed-data.csv')
-            err_df.to_csv(config.GROUND_TRUTH_DIR / 'failed-data.csv', index=False, mode='a', header=not failed_exists)
+            # err_batch = [(json_response, entry['entry_id'], generated_at, e)]
+            # err_df = pd.DataFrame(err_batch, columns=['raw_response', 'entry_id', 'generated_at', 'exception'])
+            # failed_exists = os.path.exists(config.GROUND_TRUTH_DIR / 'failed-data.csv')
+            # err_df.to_csv(config.GROUND_TRUTH_DIR / 'failed-data.csv', index=False, mode='a', header=not failed_exists)
 
         except TypeError as e:
             print(f"Invalid input type: Expected string, bytes, or bytearray. Received {type(json_response).__name__}. Skipped.")
-            err_batch = [(json_response, entry['entry_id'], generated_at, e)]
-            err_df = pd.DataFrame(err_batch, columns=['raw_response', 'entry_id', 'generated_at', 'exception'])
-            failed_exists = os.path.exists(config.GROUND_TRUTH_DIR / 'failed-data.csv')
-            err_df.to_csv(config.GROUND_TRUTH_DIR / 'failed-data.csv', index=False, mode='a', header=not failed_exists)
+            # err_batch = [(json_response, entry['entry_id'], generated_at, e)]
+            # err_df = pd.DataFrame(err_batch, columns=['raw_response', 'entry_id', 'generated_at', 'exception'])
+            # failed_exists = os.path.exists(config.GROUND_TRUTH_DIR / 'failed-data.csv')
+            # err_df.to_csv(config.GROUND_TRUTH_DIR / 'failed-data.csv', index=False, mode='a', header=not failed_exists)
 
 def main():
     from dotenv import load_dotenv

@@ -141,38 +141,55 @@ Please analyze the content and context of the generated answer in relation to th
     
     return prompt
 
-def run_judges(eval_data: list[dict], llm_client:LLMClient):
+def run_judges(eval_data: list[dict], llm_client:LLMClient, path):
+    processed_keys = set()
+    if os.path.exists(path):
+        with open(path, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    record = json.loads(line)
+                    if 'entry_id' in record:
+                        processed_keys.add(record['entry_id'])
+                except json.JSONDecodeError:
+                    continue
 
-    eval_list = []
-    for item in tqdm(eval_data):
-        faithfulness_prompt = build_faithfulness_prompt(item)
-        relevance_prompt = build_relevance_prompt(item)
-        
-        faithfulness_eval = llm_client.prompt_llm(faithfulness_prompt)
-        relevance_eval = llm_client.prompt_llm(relevance_prompt)
-        
-        f_content = faithfulness_eval.choices[0].message.content
-        f_content = f_content.strip().removeprefix('```json').removeprefix('```').removesuffix('```').strip()
-        r_content = relevance_eval.choices[0].message.content
-        r_content = r_content.strip().removeprefix('```json').removeprefix('```').removesuffix('```').strip()
-        
-        # Parse JSON strings into dictionaries, with error handling for LLM output variances
-        try:
-            f_dict = json.loads(f_content)
-            r_dict = json.loads(r_content)
+    with open(path, 'a', encoding='utf-8') as f:
+        for item in tqdm(eval_data, desc="Running Judges"):
+            question = item.get('question')
             
-            combined_eval = {
-                **item,
-                **f_dict,
-                **r_dict,                
-            }
-            eval_list.append(combined_eval) # Appends the evaluated data to the list
+            if item['entry_id'] in processed_keys:
+                continue
+                
+            try:
+                faithfulness_prompt = build_faithfulness_prompt(item)
+                relevance_prompt = build_relevance_prompt(item)
+                
+                faithfulness_eval = llm_client.prompt_llm(faithfulness_prompt)
+                relevance_eval = llm_client.prompt_llm(relevance_prompt)
+                
+                f_content = faithfulness_eval.choices[0].message.content
+                f_content = f_content.strip().removeprefix('```json').removeprefix('```').removesuffix('```').strip()
+                r_content = relevance_eval.choices[0].message.content
+                r_content = r_content.strip().removeprefix('```json').removeprefix('```').removesuffix('```').strip()
+                f_dict = json.loads(f_content)
+                r_dict = json.loads(r_content)
             
-        except json.JSONDecodeError as e:
-            print(f"JSON parsing error: {e}")
-            # Consider appending a fallback dictionary here if parsing fails
-    
-    return eval_list
+                combined_eval = {
+                    **item,
+                    **f_dict,
+                    **r_dict,                
+                }
+                f.write(json.dumps(combined_eval) + '\n')
+                f.flush()
+            
+            except Exception as e:
+                print(f"\nError judging question: '{question}'\nException: {e}")
+                break
+    results = []
+    with open(path, 'r', encoding='utf-8') as f:
+        for line in f:
+            results.append(json.loads(line))
+    return results
 
 def main(path:str = str(config.GROUND_TRUTH_DIR / 'response-evaluation-subset.csv')):
     load_dotenv()
@@ -180,13 +197,11 @@ def main(path:str = str(config.GROUND_TRUTH_DIR / 'response-evaluation-subset.cs
     vecdb_client = VectorDBClient()
     data = pd.read_csv(path)
     print("Generating responses...")
-    generated_data = generate_responses(data, llm_client, vecdb_client)
+    generated_data = generate_responses(data, str(config.EVAL_DIR) + '/generated_responses.jsonl', llm_client, vecdb_client)
     print("Running judges...")
 
-    with open(config.EVAL_DIR / 'generated_responses.json', 'w') as f:
-        json.dump(generated_data, f, indent=4)
-
-    evaluated_results = run_judges(generated_data, llm_client)
+    judged_path = str(config.EVAL_DIR) + '/response_evaluation_results.jsonl'
+    evaluated_results = run_judges(generated_data, llm_client, judged_path)
     
     output_df = pd.DataFrame(evaluated_results)
     
