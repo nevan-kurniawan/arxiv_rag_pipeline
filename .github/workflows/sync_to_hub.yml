@@ -17,4 +17,4 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git push --force https://<YOUR_HF_USERNAME>:$HF_TOKEN@huggingface.co/spaces/Nicholas-Nevan-Kurniawan/Arxiv-rag main
+          git push --force https://Nicholas-Nevan-Kurniawan:$HF_TOKEN@huggingface.co/spaces/Nicholas-Nevan-Kurniawan/Arxiv-rag main
