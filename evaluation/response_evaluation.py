@@ -7,6 +7,10 @@ from dotenv import load_dotenv
 import json
 import config
 from tqdm import tqdm
+from utils.jsonl_utils import load_jsonl
+from schemas.document import SearchSyntheticGroundTruth, ResponseSyntheticGroundTruth
+from pathlib import Path
+import time
 
 # def generate_responses(data: pd.DataFrame, path:str, llm_client: LLMClient, vecdb_client:VectorDBClient) -> list[dict]:
 #     # TODO: Add error handling, retry logic, wait between requests, etc. The full suite.
@@ -27,30 +31,29 @@ from tqdm import tqdm
         
 #     return results
 
-def generate_responses(data: pd.DataFrame, output_path: str, llm_client:LLMClient, vecdb_client:VectorDBClient) -> list[dict]:
-    processed_keys = set()
+def generate_responses(data: list[SearchSyntheticGroundTruth], output_path: Path, llm_client:LLMClient, vecdb_client:VectorDBClient):
+    processed_ids = set()
     
     # 1. Read existing state to avoid duplicate work
-    if os.path.exists(output_path):
+    if output_path.exists():
         with open(output_path, 'r', encoding='utf-8') as f:
             for line in f:
-                try:
-                    record = json.loads(line)
-                    if 'entry_id' in record:
-                        processed_keys.add(record['entry_id'])
-                except json.JSONDecodeError:
-                    continue
-
-    records = data.to_dict(orient='records')
+                if line.strip():
+                    try:
+                        record = ResponseSyntheticGroundTruth(**json.loads(line))
+                        processed_ids.add(record.entry_id)
+                    except json.JSONDecodeError:
+                        continue
     
     # 2. Open file in append mode
     with open(output_path, 'a', encoding='utf-8') as f:
-        for item in tqdm(records, desc="Generating Responses"):
-            question = item['question']
+        for entry in tqdm(data, desc="Generating Responses"):
+            question = entry.question[0]
             
             # Skip if already processed
-            if item['entry_id'] in processed_keys:
+            if entry.entry_id in processed_ids:
                 continue
+            
 
             try:
                 retrieval = vecdb_client.search(question)
@@ -60,33 +63,31 @@ def generate_responses(data: pd.DataFrame, output_path: str, llm_client:LLMClien
                 payloads = [point.payload for point in retrieval.points]
                 
                 result_item = {
-                    **item,
+                    **entry.model_dump(mode='json'),
                     'retrieved_context': payloads,
-                    'response': response.choices[0].message.content
+                    'response': response['response'].choices[0].message.content
                 }
                 
-                # 3. Stream immediately to disk
                 f.write(json.dumps(result_item) + '\n')
                 f.flush()
                 
             except Exception as e:
                 print(f"\nError processing question: '{question}'\nException: {e}")
-                break
+                continue
 
-    # 4. Reconstruct the full list from the file to pass to the next pipeline stage
-    results = []
-    with open(output_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            results.append(json.loads(line))
+    # results = []
+    # with open(output_path, 'r', encoding='utf-8') as f:
+    #     for line in f:
+    #         results.append(ResponseSyntheticGroundTruth(**json.loads(line)))
             
-    return results
+    # return results
 
-def build_faithfulness_prompt(entry: dict) -> str:
+def build_faithfulness_prompt(entry: ResponseSyntheticGroundTruth) -> str:
     """
     Constructs an evaluation prompt to measure how faithfully the generated 
     response adheres to the retrieved contexts.
     """
-    retrieved_contexts = entry.get("retrieved_context", [])
+    retrieved_contexts = entry.retrieved_context
     
     # Extract and format the contexts to maximize legibility for the judging LLM
     formatted_contexts = []
@@ -96,7 +97,7 @@ def build_faithfulness_prompt(entry: dict) -> str:
         formatted_contexts.append(f"--- Context {i+1} ---\nTitle: {title}\nSummary: {summary}")
     
     contexts_text = "\n\n".join(formatted_contexts)
-    response = entry.get("response", "")
+    response = entry.response
 
     prompt = f"""You are an objective evaluator measuring the 'faithfulness' of a generated response.
 Faithfulness evaluates whether the response is strictly grounded in the provided context on a scale of 1 to 3:
@@ -116,13 +117,13 @@ Please analyze the content and context of the generated answer in relation to th
     return prompt
 
 
-def build_relevance_prompt(entry: dict) -> str:
+def build_relevance_prompt(entry: ResponseSyntheticGroundTruth) -> str:
     """
     Constructs an evaluation prompt to measure how relevant the generated 
     response is to the original user question.
     """
-    question = entry.get("question", "")
-    response = entry.get("response", "")
+    question = entry.question[0]
+    response = entry.response
 
     prompt = f"""You are an objective evaluator measuring the 'response relevance' of a generated response.
 Response relevance evaluates how well the generated response directly answers the provided question on a scale of 1 to 3:
@@ -141,75 +142,65 @@ Please analyze the content and context of the generated answer in relation to th
     
     return prompt
 
-def run_judges(eval_data: list[dict], llm_client:LLMClient, path):
-    processed_keys = set()
-    if os.path.exists(path):
-        with open(path, 'r', encoding='utf-8') as f:
+def run_judges(eval_data: list[ResponseSyntheticGroundTruth], llm_client:LLMClient, output_path:Path):
+    processed_ids = set()
+    # 1. Read existing state to avoid duplicate work
+    if output_path.exists():
+        with open(output_path, 'r', encoding='utf-8') as f:
             for line in f:
-                try:
-                    record = json.loads(line)
-                    if 'entry_id' in record:
-                        processed_keys.add(record['entry_id'])
-                except json.JSONDecodeError:
-                    continue
+                if line.strip():
+                    try:
+                        record = ResponseSyntheticGroundTruth(**json.loads(line))
+                        processed_ids.add(record.entry_id)
+                    except json.JSONDecodeError:
+                        continue
 
-    with open(path, 'a', encoding='utf-8') as f:
-        for item in tqdm(eval_data, desc="Running Judges"):
-            question = item.get('question')
+    with open(output_path, 'a', encoding='utf-8') as f:
+        for entry in tqdm(eval_data, desc="Running Judges"):
+            question = entry.question[0]
             
-            if item['entry_id'] in processed_keys:
+            if entry.entry_id in processed_ids:
                 continue
-                
+
             try:
-                faithfulness_prompt = build_faithfulness_prompt(item)
-                relevance_prompt = build_relevance_prompt(item)
+                faithfulness_prompt = build_faithfulness_prompt(entry)
+                relevance_prompt = build_relevance_prompt(entry)
                 
                 faithfulness_eval = llm_client.prompt_llm(faithfulness_prompt)
                 relevance_eval = llm_client.prompt_llm(relevance_prompt)
                 
-                f_content = faithfulness_eval.choices[0].message.content
+                f_content = faithfulness_eval['response'].choices[0].message.content
                 f_content = f_content.strip().removeprefix('```json').removeprefix('```').removesuffix('```').strip()
-                r_content = relevance_eval.choices[0].message.content
+                r_content = relevance_eval['response'].choices[0].message.content
                 r_content = r_content.strip().removeprefix('```json').removeprefix('```').removesuffix('```').strip()
                 f_dict = json.loads(f_content)
                 r_dict = json.loads(r_content)
             
                 combined_eval = {
-                    **item,
+                    **entry.model_dump(mode='json'),
                     **f_dict,
-                    **r_dict,                
+                    **r_dict,
+                    'evaluation_generated_by': relevance_eval['model']               
                 }
                 f.write(json.dumps(combined_eval) + '\n')
                 f.flush()
             
             except Exception as e:
                 print(f"\nError judging question: '{question}'\nException: {e}")
-                break
-    results = []
-    with open(path, 'r', encoding='utf-8') as f:
-        for line in f:
-            results.append(json.loads(line))
-    return results
+                continue
 
-def main(path:str = str(config.GROUND_TRUTH_DIR / 'response-evaluation-subset.csv')):
+def main(path:Path = config.GROUND_TRUTH_DIR / 'response-evaluation-subset.jsonl'):
     load_dotenv()
-    llm_client = LLMClient(os.environ["GEMINI_API_KEY"])
+    llm_client = LLMClient(os.environ["GROQ_API_KEY"])
     vecdb_client = VectorDBClient()
-    data = pd.read_csv(path)
+    data = load_jsonl(SearchSyntheticGroundTruth, path)
     print("Generating responses...")
-    generated_data = generate_responses(data, str(config.EVAL_DIR) + '/generated_responses.jsonl', llm_client, vecdb_client)
+    generate_responses(data, config.EVAL_DIR / 'generated_responses.jsonl', llm_client, vecdb_client)
+    generated_data = load_jsonl(ResponseSyntheticGroundTruth, config.EVAL_DIR / 'generated_responses.jsonl')
     print("Running judges...")
+    judged_path = config.EVAL_DIR / 'response_evaluation_results.jsonl'
 
-    judged_path = str(config.EVAL_DIR) + '/response_evaluation_results.jsonl'
-    evaluated_results = run_judges(generated_data, llm_client, judged_path)
-    
-    output_df = pd.DataFrame(evaluated_results)
-    
-    output_df.to_json(
-        config.EVAL_DIR / 'response_evaluation_results.json',
-        orient='records', 
-        indent=4
-    )
+    run_judges(generated_data, llm_client, judged_path)
 
 if __name__ == "__main__":
     main()

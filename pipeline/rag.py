@@ -40,4 +40,8 @@ def query(question: str, vecdb_client:VectorDBClient, llm_client:LLMClient, limi
     retrieval = vecdb_client.search(question, limit=limit)
     prompt = build_prompt(retrieval, question)
     response = llm_client.prompt_llm(prompt)
-    return response.choices[0].message.content
+    reply = response['response'].choices[0].message.content
+    if reply is not None:
+        return reply
+    else:
+        return "Reply error"

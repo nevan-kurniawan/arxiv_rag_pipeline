@@ -1,16 +1,34 @@
 from qdrant_client import QdrantClient, models
 from fastembed import TextEmbedding, SparseTextEmbedding
+from typing import List, Dict
+from schemas.document import ArxivDocument
+import uuid
 
 class VectorDBClient:
+    """_summary_
+    """
     def __init__(self, dense_embedding_model_handle: str = "jinaai/jina-embeddings-v2-small-en",
                  sparse_embedding_model_handle: str = 'Qdrant/bm25',
                  port_link: str = "http://localhost:6333"):
-        self.client = QdrantClient(port_link)
-        self.collection_list = self.client.get_collections()
+        """_summary_
+
+        Args:
+            dense_embedding_model_handle (str, optional): _description_. Defaults to "jinaai/jina-embeddings-v2-small-en".
+            sparse_embedding_model_handle (str, optional): _description_. Defaults to 'Qdrant/bm25'.
+            port_link (_type_, optional): _description_. Defaults to "http://localhost:6333".
+        """
+        # self.client = QdrantClient(port_link)
+        self.client = QdrantClient("qdrant", port=6333)
+        # self.collection_list = self.client.get_collections()
         self.dense_embedder = TextEmbedding(model_name=dense_embedding_model_handle)
         self.sparse_embedder = SparseTextEmbedding(model_name=sparse_embedding_model_handle)
 
     def make_collection(self, collection_name:str = 'arxiv-rag'):
+        """_summary_
+
+        Args:
+            collection_name (str, optional): _description_. Defaults to 'arxiv-rag'.
+        """
         if not self.client.collection_exists(collection_name=collection_name):
             self.client.create_collection(
                 collection_name=collection_name,
@@ -26,32 +44,46 @@ class VectorDBClient:
             print(f'Collection {collection_name} already exists!')
 
     def delete_collection(self, collection_name:str = 'arxiv-rag'):
+        """_summary_
+
+        Args:
+            collection_name (str, optional): _description_. Defaults to 'arxiv-rag'.
+        """
         self.client.delete_collection(collection_name=collection_name)
         print(f"Collection {collection_name} deleted!")
 
-    def upsert_points(self, docs:list[dict], collection_name:str = 'arxiv-rag'):
+    def upsert_points(self, docs:list[ArxivDocument], collection_name:str = 'arxiv-rag'):
+        """_summary_
 
-        id = [i for i in range(0, len(docs))]
-        raw_text = [doc['summary'] for doc in docs]
+        Args:
+            docs (list[ArxivDocument]): _description_
+            collection_name (str, optional): _description_. Defaults to 'arxiv-rag'.
+        """
+
+        docs_list = list(docs)
+        raw_text = [doc.summary for doc in docs_list]
         dense_embedding = list(self.dense_embedder.embed(raw_text))
         sparse_embedding = list(self.sparse_embedder.embed(raw_text))
-        payload = docs
 
-        qdrant_points = [
-            models.PointStruct(
-                id=id[i],
-                vector = {
-                        'dense': list(dense_embedding[i]),
+        qdrant_points = []
+
+        for i, doc in enumerate(docs_list):
+            point_id = str(uuid.uuid5(uuid.NAMESPACE_URL, doc.summary))
+            payload_dict = doc.model_dump(mode='json')
+            
+            qdrant_points.append(
+                models.PointStruct(
+                    id = point_id,
+                    vector={
+                        'dense': dense_embedding[i].tolist(),
                         'sparse': models.SparseVector(
                             indices = sparse_embedding[i].indices.tolist(),
                             values = sparse_embedding[i].values.tolist()
                         )
                     },
-                payload = {
-                    **payload[i],
-                    'id': id[i]
-                    }
-        ) for i in range(0, len(docs))]
+                    payload=payload_dict
+                )
+            )
 
         self.client.upsert(
             collection_name=collection_name,
