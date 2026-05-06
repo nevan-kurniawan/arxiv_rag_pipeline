@@ -1,3 +1,12 @@
+---
+title: Arxig-rag
+emoji: 🚀
+colorFrom: blue
+colorTo: red
+sdk: docker
+pinned: false
+---
+
 # Arxiv Research assistant
 ArXiv Research Assistant is an end-to-end RAG pipeline that synthesizes recent deep learning research from ArXiv into conversational answers. It uses hybrid dense and sparse retrieval over a daily-updated vector database, with a full evaluation harness measuring retrieval quality and answer faithfulness  + relevance.
 
