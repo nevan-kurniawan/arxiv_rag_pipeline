@@ -1,0 +1,20 @@
+name: Sync to Hugging Face Hub
+
+on:
+  push:
+    branches: [main] # Update this if your primary branch has a different name
+  workflow_dispatch: # Allows manual triggering from the GitHub Actions UI
+
+jobs:
+  sync-to-hub:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # Fetches the entire history
+          lfs: true # Essential if you are tracking large files
+      - name: Push to Hub
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git push --force https://<YOUR_HF_USERNAME>:$HF_TOKEN@huggingface.co/spaces/Nicholas-Nevan-Kurniawan/Arxiv-rag main

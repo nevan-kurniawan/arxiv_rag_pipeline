@@ -1,8 +1,8 @@
 from qdrant_client import QdrantClient, models
 from fastembed import TextEmbedding, SparseTextEmbedding
-from typing import List, Dict
 from schemas.document import ArxivDocument
 import uuid
+import os
 
 class VectorDBClient:
     """_summary_
@@ -18,7 +18,7 @@ class VectorDBClient:
             port_link (_type_, optional): _description_. Defaults to "http://localhost:6333".
         """
         # self.client = QdrantClient(port_link)
-        self.client = QdrantClient("qdrant", port=6333)
+        self.client = QdrantClient(port=6333, api_key=os.environ["QDRANT_API_KEY"], url=os.environ["QDRANT_CLUSTER_ENDPOINT"])
         # self.collection_list = self.client.get_collections()
         self.dense_embedder = TextEmbedding(model_name=dense_embedding_model_handle)
         self.sparse_embedder = SparseTextEmbedding(model_name=sparse_embedding_model_handle)
