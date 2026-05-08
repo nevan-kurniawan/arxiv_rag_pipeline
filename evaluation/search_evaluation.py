@@ -1,6 +1,6 @@
 from clients.vecdb_client import VectorDBClient
 import numpy as np
-import config
+import config.paths as paths
 from utils.jsonl_utils import load_jsonl
 from schemas.document import SearchSyntheticGroundTruth
 from pathlib import Path
@@ -46,12 +46,12 @@ def run_evaluation(ground_truth: list[SearchSyntheticGroundTruth], search_functi
         f'map_k_{top_k}': map_at_k(arr)
     }
 
-def main(ground_truth_path: Path = config.GROUND_TRUTH_DIR / 'search-ground-truth-data.jsonl', top_k:int = 10):
+def main(ground_truth_path: Path = paths.GROUND_TRUTH_DIR / 'search-ground-truth-data.jsonl', top_k:int = 10):
     vecdb_client = VectorDBClient()
     ground_truth = load_jsonl(SearchSyntheticGroundTruth, ground_truth_path)
     result = run_evaluation(ground_truth, vecdb_client, top_k=top_k)
     
-    output_path = config.EVAL_DIR / 'search_evaluation_results.jsonl'
+    output_path = paths.EVAL_DIR / 'search_evaluation_results.jsonl'
     
     output_path.parent.mkdir(parents=True, exist_ok=True)
     

@@ -1,8 +1,14 @@
 from pydantic import BaseModel
-from openai.types.chat import ChatCompletion
+from datetime import datetime
+
+class TokenDetails(BaseModel):
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
 
 class LLMResponse(BaseModel):
+    response: str
     provider: str
-    response: ChatCompletion
     model: str
-    
+    token_details: TokenDetails
+    generated_at: datetime

@@ -5,7 +5,7 @@ import pandas as pd
 import os
 from dotenv import load_dotenv
 import json
-import config
+import config.paths as paths
 from tqdm import tqdm
 from utils.jsonl_utils import load_jsonl
 from schemas.document import SearchSyntheticGroundTruth, ResponseSyntheticGroundTruth
@@ -189,16 +189,16 @@ def run_judges(eval_data: list[ResponseSyntheticGroundTruth], llm_client:LLMClie
                 print(f"\nError judging question: '{question}'\nException: {e}")
                 continue
 
-def main(path:Path = config.GROUND_TRUTH_DIR / 'response-evaluation-subset.jsonl'):
+def main(path:Path = paths.GROUND_TRUTH_DIR / 'response-evaluation-subset.jsonl'):
     load_dotenv()
     llm_client = LLMClient(os.environ["GROQ_API_KEY"])
     vecdb_client = VectorDBClient()
     data = load_jsonl(SearchSyntheticGroundTruth, path)
     print("Generating responses...")
-    generate_responses(data, config.EVAL_DIR / 'generated_responses.jsonl', llm_client, vecdb_client)
-    generated_data = load_jsonl(ResponseSyntheticGroundTruth, config.EVAL_DIR / 'generated_responses.jsonl')
+    generate_responses(data, paths.EVAL_DIR / 'generated_responses.jsonl', llm_client, vecdb_client)
+    generated_data = load_jsonl(ResponseSyntheticGroundTruth, paths.EVAL_DIR / 'generated_responses.jsonl')
     print("Running judges...")
-    judged_path = config.EVAL_DIR / 'response_evaluation_results.jsonl'
+    judged_path = paths.EVAL_DIR / 'response_evaluation_results.jsonl'
 
     run_judges(generated_data, llm_client, judged_path)
 

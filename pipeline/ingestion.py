@@ -1,6 +1,6 @@
 import arxiv
 from datetime import datetime, timedelta, timezone
-import config
+import config.paths as paths
 from typing import List
 from schemas.document import ArxivDocument
 from pathlib import Path
@@ -87,7 +87,7 @@ def main(
         target_category: str = "cs.AI",
         lookback_days: int = 30,
         limit: int = 100,
-        output_path: Path = config.RAW_DATA / 'arxiv_data_cache.jsonl'
+        output_path: Path = paths.RAW_DATA / 'arxiv_data_cache.jsonl'
 ) -> None:
     """Orchestrates the data extraction, transformation, and loading process.
 

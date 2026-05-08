@@ -1,0 +1,13 @@
+providers:
+  groq:
+    base_url: "https://api.groq.com/openai/v1"
+    models:
+      - llama-3.1-8b-instant
+      - llama-3.3-70b-versatile
+      - openai/gpt-oss-120b
+      - openai/gpt-oss-20b
+      - qwen/qwen3-32b
+  google:
+    base_url: "https://generativelanguage.googleapis.com/v1beta/openai/"
+    models:
+      - gemini-3.1-flash-lite-preview

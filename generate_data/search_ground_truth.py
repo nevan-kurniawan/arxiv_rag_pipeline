@@ -4,7 +4,7 @@ from tqdm import tqdm
 from clients.llm_client import LLMClient
 from datetime import datetime, timezone
 import json
-import config
+import config.paths as paths
 from schemas.document import ArxivDocument, SearchSyntheticGroundTruth
 from utils.jsonl_utils import load_jsonl
 from pathlib import Path
@@ -121,8 +121,8 @@ def main():
     load_dotenv()
     llm_client = LLMClient(os.environ["GROQ_API_KEY"])
 
-    data = load_jsonl(ArxivDocument, config.RAW_DATA / 'arxiv_data_cache.jsonl')
-    generate_data(data=data, llm_client=llm_client, output_path=config.GROUND_TRUTH_DIR / 'search-ground-truth-data.jsonl')
+    data = load_jsonl(ArxivDocument, paths.RAW_DATA / 'arxiv_data_cache.jsonl')
+    generate_data(data=data, llm_client=llm_client, output_path=paths.GROUND_TRUTH_DIR / 'search-ground-truth-data.jsonl')
 
 if __name__ == '__main__':
     main()

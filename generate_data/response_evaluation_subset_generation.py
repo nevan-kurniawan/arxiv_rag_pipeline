@@ -1,10 +1,10 @@
 import pandas as pd
-import config
+import config.paths as paths
 from utils.jsonl_utils import load_jsonl
 from schemas.document import SearchSyntheticGroundTruth
 
 def main():
-    data = load_jsonl(SearchSyntheticGroundTruth, config.GROUND_TRUTH_DIR / 'search-ground-truth-data.jsonl')
+    data = load_jsonl(SearchSyntheticGroundTruth, paths.GROUND_TRUTH_DIR / 'search-ground-truth-data.jsonl')
     df = pd.DataFrame([item.model_dump(mode='json') for item in data])
     unique_papers_df = df.groupby('entry_id').sample(n=1, random_state=42)
     unique_papers_df['question'] = unique_papers_df['question'].str[0:1]
@@ -13,7 +13,7 @@ def main():
 
     evaluation_subset = unique_papers_df.sample(n=100, random_state=42)
 
-    evaluation_subset.to_json(config.GROUND_TRUTH_DIR / 'response-evaluation-subset.jsonl', orient='records', lines=True)
+    evaluation_subset.to_json(paths.GROUND_TRUTH_DIR / 'response-evaluation-subset.jsonl', orient='records', lines=True)
 
     print(f"Subset generated successfully. Total unique papers: {len(evaluation_subset)}")
 
