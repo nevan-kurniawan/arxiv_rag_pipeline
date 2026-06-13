@@ -8,16 +8,13 @@ class VectorDBClient:
     """_summary_
     """
     def __init__(self, dense_embedding_model_handle: str = "jinaai/jina-embeddings-v2-small-en",
-                 sparse_embedding_model_handle: str = 'Qdrant/bm25',
-                 port_link: str = "http://localhost:6333"):
+                 sparse_embedding_model_handle: str = 'Qdrant/bm25'):
         """_summary_
 
         Args:
             dense_embedding_model_handle (str, optional): _description_. Defaults to "jinaai/jina-embeddings-v2-small-en".
             sparse_embedding_model_handle (str, optional): _description_. Defaults to 'Qdrant/bm25'.
-            port_link (_type_, optional): _description_. Defaults to "http://localhost:6333".
         """
-        # self.client = QdrantClient(port_link)
         self.client = QdrantClient(port=6333, api_key=os.environ["QDRANT_API_KEY"], url=os.environ["QDRANT_CLUSTER_ENDPOINT"])
         # self.collection_list = self.client.get_collections()
         self.dense_embedder = TextEmbedding(model_name=dense_embedding_model_handle)

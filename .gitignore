@@ -11,5 +11,10 @@ wheels/
 .venv/
 .env
 .env/
+archive
+archive/
+data
+data/
+repomix-output.xml
 
 qdrant_storage

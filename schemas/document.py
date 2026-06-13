@@ -1,6 +1,5 @@
 from pydantic import BaseModel
 from datetime import datetime
-# from collections.abc import Callable
 
 class ArxivDocument(BaseModel):
     """_summary_
