@@ -7,7 +7,7 @@ import json
 import config.paths as paths
 from tqdm import tqdm
 from utils.jsonl_utils import load_jsonl
-from schemas.document import SearchSyntheticGroundTruth, ResponseSyntheticGroundTruth
+from schemas.document import SearchSyntheticGroundTruth, ResponseSyntheticGroundTruth, JudgementRecord
 from pathlib import Path
 
 
@@ -176,7 +176,8 @@ def run_judges(
                     **r_dict,
                     "evaluation_generated_by": relevance_eval.model,
                 }
-                f.write(json.dumps(combined_eval) + "\n")
+                judgement_entry = JudgementRecord(**combined_eval)
+                f.write(judgement_entry.model_dump_json() + "\n")
                 f.flush()
 
             except Exception as e:

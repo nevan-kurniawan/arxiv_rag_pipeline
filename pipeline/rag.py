@@ -47,9 +47,10 @@ def query(
     vecdb_client: VectorDBClient,
     llm_client: LLMClient,
     llm_model,
-    limit: int = 3,
+    mode = 'rrf',
+    top_k: int = 3,
 ) -> str:
-    retrieval = vecdb_client.search(question, limit=limit)
+    retrieval = vecdb_client.search(question, mode = mode, prefetch_limit = 10*top_k, top_k=top_k)
     prompt = build_prompt(retrieval, question)
     response = llm_client.prompt_llm(prompt, llm_model=llm_model)
     reply = response.response
