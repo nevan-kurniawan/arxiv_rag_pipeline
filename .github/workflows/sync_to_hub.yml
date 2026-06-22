@@ -1,10 +1,8 @@
 name: Sync to Hugging Face Hub
-
 on:
   push:
     branches: [main]
   workflow_dispatch:
-
 jobs:
   sync-to-hub:
     runs-on: ubuntu-latest
@@ -17,4 +15,15 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git push --force https://Nicholas-Nevan-Kurniawan:$HF_TOKEN@huggingface.co/spaces/Nicholas-Nevan-Kurniawan/Arxiv-rag main
+          pip install huggingface_hub
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+          HfApi().upload_folder(
+              folder_path=".",
+              repo_id="Nicholas-Nevan-Kurniawan/Arxiv-rag",
+              repo_type="space",
+              token=os.environ["HF_TOKEN"],
+              ignore_patterns=[".git", ".github", ".venv", "__pycache__", "*.pyc", ".env", "data/", "archive/", "scratch/"],
+          )
+          EOF
