@@ -2,11 +2,6 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 
 class ArxivDocument(BaseModel):
-    """_summary_
-
-    Args:
-        BaseModel (_type_): _description_
-    """
     title: str
     categories: list[str]
     authors: list[str]

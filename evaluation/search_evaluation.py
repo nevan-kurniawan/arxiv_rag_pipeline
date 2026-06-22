@@ -6,6 +6,7 @@ from schemas.document import SearchSyntheticGroundTruth
 from pathlib import Path
 import json
 from typing import Literal
+from tqdm import tqdm
 
 
 def hit_rate(relevance_matrix: np.ndarray) -> float:
@@ -37,8 +38,8 @@ def run_evaluation(
     ground_truth: list[SearchSyntheticGroundTruth],
     search_function: VectorDBClient,
     mode: Literal["dense", "sparse", "cascade", "rrf"],
-    prefetch_limit: int = 100,
-    top_k: int = 10,
+    prefetch_limit: int = 30,
+    top_k: int = 3,
 ):
     bool_match_list = []
     for entry in ground_truth:
@@ -61,7 +62,7 @@ def run_evaluation(
         # "map": map_at_k(arr),
         "mode": mode,
         "prefetch_limit": prefetch_limit,
-        "top_k": top_k
+        "top_k": top_k,
     }
 
 
@@ -69,12 +70,19 @@ def main(
     prefetch_limit: int,
     top_k: int,
     output_path: Path,
+    client: VectorDBClient,
     mode: Literal["dense", "sparse", "cascade", "rrf"],
-    ground_truth_path: Path = paths.GROUND_TRUTH_DIR / "search-ground-truth-data.jsonl",
+    ground_truth: list[SearchSyntheticGroundTruth],
 ):
-    vecdb_client = VectorDBClient()
-    ground_truth = load_jsonl(SearchSyntheticGroundTruth, ground_truth_path)
-    result = run_evaluation(ground_truth, vecdb_client, mode=mode, prefetch_limit=prefetch_limit, top_k=top_k)
+    vecdb_client = client
+    ground_truth = ground_truth
+    result = run_evaluation(
+        ground_truth,
+        vecdb_client,
+        mode=mode,
+        prefetch_limit=prefetch_limit,
+        top_k=top_k,
+    )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -83,11 +91,8 @@ def main(
 
 
 if __name__ == "__main__":
-    output_path = paths.EVAL_DIR / "search_evaluation_results.jsonl"
-
-    # Clear once at the start so one sweep produces one fresh file.
+    output_path = paths.RESULTS_DIR / "search_evaluation_results.jsonl"
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text("", encoding="utf-8")
 
     modes: list[Literal["dense", "sparse", "cascade", "rrf"]] = [
         "dense",
@@ -97,12 +102,34 @@ if __name__ == "__main__":
     ]
     k_values = [1, 3, 5, 10, 20]
 
-    for mode in modes:
-        for k in k_values:
-            print(f"Running mode={mode}, top_k={k}...")
-            main(
-                prefetch_limit=k*10,
-                top_k=k,
-                output_path=output_path,
-                mode=mode,
-            )
+    client = VectorDBClient()
+
+    completed = set()
+
+    if output_path.exists():
+        with open(output_path, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        record = json.loads(line)
+                        completed.add((record["mode"], record["top_k"]))
+                    except json.JSONDecodeError:
+                        continue
+
+    ground_truth = load_jsonl(
+        SearchSyntheticGroundTruth,
+        paths.GROUND_TRUTH_DIR / "search-ground-truth-data.jsonl",
+    )
+
+    for mode in tqdm(modes):
+        for k in tqdm(k_values):
+            if (mode, k) not in completed:
+                print(f"Running mode={mode}, top_k={k}...")
+                main(
+                    prefetch_limit=k * 10,
+                    top_k=k,
+                    output_path=output_path,
+                    mode=mode,
+                    client=client,
+                    ground_truth=ground_truth,
+                )

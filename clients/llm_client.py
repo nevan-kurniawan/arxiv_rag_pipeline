@@ -28,11 +28,28 @@ class LLMClient:
             f"Rate limited. Retrying in {retry_state.next_action.sleep} seconds..."
         ),
     )
-    def prompt_llm(self, prompt: str, llm_model: str) -> LLMResponse:
-
+    def prompt_llm(
+        self,
+        prompt: str,
+        llm_model: str,
+        temperature: float | None = None,
+        reasoning_effort: str | None = None,
+        include_reasoning: bool | None = None,
+    ) -> LLMResponse:
+        kwargs = {
+            "model": llm_model,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+        if reasoning_effort is not None:
+            kwargs["reasoning_effort"] = reasoning_effort
+        if include_reasoning is not None:
+            kwargs["include_reasoning"] = include_reasoning
         response = self.llm_client.chat.completions.create(
-            model=llm_model, messages=[{"role": "user", "content": prompt}]
+            **kwargs,
         )
+
         usage = response.usage
 
         token_details = TokenDetails(

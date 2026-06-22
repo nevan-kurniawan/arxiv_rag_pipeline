@@ -2,8 +2,8 @@ name: Sync to Hugging Face Hub
 
 on:
   push:
-    branches: [main] # Update this if your primary branch has a different name
-  workflow_dispatch: # Allows manual triggering from the GitHub Actions UI
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   sync-to-hub:
@@ -11,8 +11,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 0 # Fetches the entire history
-          lfs: true # Essential if you are tracking large files
+          fetch-depth: 0
+          lfs: true
       - name: Push to Hub
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}

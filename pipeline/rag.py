@@ -1,8 +1,10 @@
 from clients.llm_client import LLMClient
 from clients.vecdb_client import VectorDBClient
+from qdrant_client.models import QueryResponse
 
 
-def build_prompt(query_results, query) -> str:
+def build_prompt(query_results: QueryResponse, query: str) -> str:
+    """Prompt builder for LLM query. Takes in the retrieved documents from the Qdrant client, the query, and returns the final prompt to be sentto the LLM."""
     system_prompt = (
         "You are a chatbot designed to synthesize and summarize the results of a search "
         "on the Arxiv database of papers in the last 30 days based on the user's queries. "
@@ -24,15 +26,14 @@ def build_prompt(query_results, query) -> str:
         categories_str = ", ".join(categories_list)
         title = query_results.points[i].payload.get("title", "Untitled")
 
-        # Properly utilize f-strings for variable interpolation
         result_block = (
             f"RESULT {i + 1}:\n"
             f"    Title: {title}\n"
             f"    Authors: {authors_str}\n"
             f"    Categories: {categories_str}\n"
-            f"    Abstract: {query_results.points[i].payload.get('summary', ['Unknown abstract'])}\n"
-            f"    Published date: {query_results.points[i].payload.get('published', ['Unknown date'])}\n"
-            f"    Entry ID: {query_results.points[i].payload.get('entry_id', ['Unknown ID'])}\n"
+            f"    Abstract: {query_results.points[i].payload.get('summary', 'Unknown abstract')}\n"
+            f"    Published date: {query_results.points[i].payload.get('published', 'Unknown date')}\n"
+            f"    Entry ID: {query_results.points[i].payload.get('entry_id', 'Unknown ID')}\n"
         )
         formatted_results.append(result_block)
 
@@ -47,10 +48,13 @@ def query(
     vecdb_client: VectorDBClient,
     llm_client: LLMClient,
     llm_model,
-    mode = 'rrf',
+    mode="rrf",
     top_k: int = 3,
 ) -> str:
-    retrieval = vecdb_client.search(question, mode = mode, prefetch_limit = 10*top_k, top_k=top_k)
+    """Takes in a question, queries the vector database with reciprocal rank fusion setting, queries the LLM with the query and returned documents from the database, and returns the LLM response."""
+    retrieval = vecdb_client.search(
+        question, mode=mode, prefetch_limit=10 * top_k, top_k=top_k
+    )
     prompt = build_prompt(retrieval, question)
     response = llm_client.prompt_llm(prompt, llm_model=llm_model)
     reply = response.response

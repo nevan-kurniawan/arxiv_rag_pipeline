@@ -10,20 +10,41 @@ from pathlib import Path
 
 
 def build_prompt(data: ArxivDocument) -> str:
-    """Build the prompt that asks an LLM to generate 5 retrieval questions for one paper."""
-    prompt_template = """
-    Your task is to generate a synthetic dataset for an Arxiv retrieval pipeline. For every entry, formulate 5 questions a user might ask where the entry would naturally be retrieved as a source of information to assist in answering the user's questions. The entry should contain relevant information to the questions, and the questions should be complete and not too short. If possible, use as few words as possible from the entry. Formulate questions using your own words rather than phrases from the entry.
+    """Build the prompt that asks an LLM to generate 5 retrieval questions for one paper.
 
-    The entry:
+    Questions are written from the searcher's information need before they know the
+    paper exists.
+    """
+    prompt_template = """
+    You generate realistic retrieval questions for an Arxiv search benchmark. The goal is to simulate what a real researcher would type into a search box BEFORE they know this paper exists.
+
+    Given one paper, write exactly 5 questions such that this paper would be a strong answer — but each question must describe a general INFORMATION NEED or PROBLEM, not this specific paper.
+
+    Hard rules:
+    - Do NOT name any method, model, system, framework, benchmark, dataset, or metric coined by this paper. Describe the general concept instead. If the paper introduces "FooNet for X", ask about "X" or "approaches to X", never "FooNet".
+    - Do NOT refer to "the authors", "the study", "the paper", "this work", "the proposed method", or any framing that presupposes the reader has seen the paper.
+    - Do NOT paraphrase the abstract's contribution sentences. Someone who has not read this paper should find every question natural — describing a problem, not a specific solution.
+    - Phrase each question from the perspective of someone who HAS the problem but does NOT yet know the solution. Describe the problem, not the answer.
+    - Keep the problem specific enough that this paper is genuinely the best answer. Keep the *task, setting, and constraint* precise; drop only the *coined name and contribution framing*. "Quantizing a state-space model to ternary weights without retraining from scratch" is specific enough. "Making models smaller" is too generic and is wrong.
+    - Vary the angle across the 5: motivation, method, trade-offs, evaluation, limitations — always at the level of the general problem.
+
+    Process (think before writing):
+    1. Identify the underlying problem this paper addresses, stripped of the paper's own naming and framing.
+    2. Write 5 questions a researcher facing that problem might search for, before they know this paper exists.
+
+    Return ONLY a JSON array of exactly 5 plain strings. Each element must be a string, not an object. Do not include entry_id, relevance, keys, nesting, commentary, or markdown.
+
+    Correct format (placeholders show shape only — write real questions about the problem):
+    ["<question 1>", "<question 2>", "<question 3>", "<question 4>", "<question 5>"]
+
+    Incorrect format (do NOT do this):
+    [{{"question": "..."}}, {{"entry_id": "...", "question": "..."}}]
+
+    Paper:
     title: {title}
     categories: {categories}
     authors: {authors}
     summary: {summary}
-    entry_id: {entry_id}
-    published: {published}
-
-    Provide the output in parsable JSON without using code blocks:
-    ["question1", "question2", ..., "question5"]
     """.strip()
     return prompt_template.format(**data.model_dump(mode="json"))
 
@@ -34,7 +55,7 @@ def generate_data(
     llm_model: str,
     output_path: Path,
 ):
-    """Generate 5 synthetic retrieval questions per paper, with idempotent resume."""
+    """Generate 5 synthetic retrieval questions per paper."""
     processed_ids: set[str] = set()
 
     if output_path.exists():
@@ -75,7 +96,9 @@ def generate_data(
                 raw_questions = json.loads(json_response)
 
                 if not isinstance(raw_questions, list):
-                    raise TypeError(f"Expected a list, received {type(raw_questions).__name__}")
+                    raise TypeError(
+                        f"Expected a list, received {type(raw_questions).__name__}"
+                    )
 
                 output_record = SearchSyntheticGroundTruth(
                     entry_id=entry.entry_id,
@@ -88,7 +111,9 @@ def generate_data(
                 file.flush()
 
             except json.JSONDecodeError as e:
-                print(f"Error parsing JSON for {entry.entry_id}: {e.msg} at line {e.lineno}, column {e.colno}. Skipped.")
+                print(
+                    f"Error parsing JSON for {entry.entry_id}: {e.msg} at line {e.lineno}, column {e.colno}. Skipped."
+                )
             except Exception as e:
                 print(f"Unexpected error processing {entry.entry_id}: {e}. Skipped.")
 
@@ -102,11 +127,13 @@ def main():
         api_key=os.environ["GROQ_API_KEY"],
         base_url="https://api.groq.com/openai/v1",
     )
-    data = load_jsonl(ArxivDocument, paths.RAW_DATA / "arxiv_data_cache.jsonl")
+    data = load_jsonl(
+        ArxivDocument, paths.GROUND_TRUTH_DIR / "corpus_raw_subsample.jsonl"
+    )
     generate_data(
         data=data,
         llm_client=llm_client,
-        llm_model="llama-3.3-70b-versatile",
+        llm_model="qwen/qwen3-32b",
         output_path=paths.GROUND_TRUTH_DIR / "search-ground-truth-data.jsonl",
     )
 

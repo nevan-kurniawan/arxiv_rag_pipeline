@@ -7,19 +7,13 @@ from typing import Literal
 
 
 class VectorDBClient:
-    """_summary_"""
+    """Wraps Qdrant for hybrid dense + sparse retrieval over ArxivDocument summaries."""
 
     def __init__(
         self,
         dense_embedding_model_handle: str = "jinaai/jina-embeddings-v2-small-en",
         sparse_embedding_model_handle: str = "Qdrant/bm25",
     ):
-        """_summary_
-
-        Args:
-            dense_embedding_model_handle (str, optional): _description_. Defaults to "jinaai/jina-embeddings-v2-small-en".
-            sparse_embedding_model_handle (str, optional): _description_. Defaults to 'Qdrant/bm25'.
-        """
         self.client = QdrantClient(
             api_key=os.environ["QDRANT_API_KEY"],
             url=os.environ["QDRANT_CLUSTER_ENDPOINT"],
@@ -31,12 +25,17 @@ class VectorDBClient:
             model_name=sparse_embedding_model_handle
         )
 
-    def make_collection(self, collection_name: str = "arxiv-rag"):
-        """_summary_
+        self._embed_cache: dict[str, tuple] = {}
 
-        Args:
-            collection_name (str, optional): _description_. Defaults to 'arxiv-rag'.
-        """
+    def _embed_query(self, query: str):
+        if query not in self._embed_cache:
+            dense = next(iter(self.dense_embedder.embed([query]))).tolist()
+            sparse = next(iter(self.sparse_embedder.embed([query])))
+            self._embed_cache[query] = (dense, sparse)
+        return self._embed_cache[query]
+
+    def make_collection(self, collection_name: str = "arxiv-rag"):
+        """Create the hybrid collection if it doesn't already exist"""
         if not self.client.collection_exists(collection_name=collection_name):
             self.client.create_collection(
                 collection_name=collection_name,
@@ -53,23 +52,13 @@ class VectorDBClient:
             print(f"Collection {collection_name} already exists!")
 
     def delete_collection(self, collection_name: str = "arxiv-rag"):
-        """_summary_
-
-        Args:
-            collection_name (str, optional): _description_. Defaults to 'arxiv-rag'.
-        """
         self.client.delete_collection(collection_name=collection_name)
         print(f"Collection {collection_name} deleted!")
 
     def upsert_points(
         self, docs: list[ArxivDocument], collection_name: str = "arxiv-rag"
     ):
-        """_summary_
-
-        Args:
-            docs (list[ArxivDocument]): _description_
-            collection_name (str, optional): _description_. Defaults to 'arxiv-rag'.
-        """
+        """Embed each document's summary and upsert as a hybrid point with deterministic UUID5 IDs."""
 
         docs_list = list(docs)
         raw_text = [doc.summary for doc in docs_list]
@@ -101,13 +90,14 @@ class VectorDBClient:
     def search(
         self,
         query: str,
-        mode:Literal["dense", "sparse", "cascade", "rrf"],
+        mode: Literal["dense", "sparse", "cascade", "rrf"],
         collection_name: str = "arxiv-rag",
-        prefetch_limit: int = 100,
-        top_k: int = 10,
+        prefetch_limit: int = 30,
+        top_k: int = 3,
     ):
-        dense_query_embedding = next(iter(self.dense_embedder.embed([query]))).tolist()
-        sparse_query_embedding = next(iter(self.sparse_embedder.embed([query])))
+        """Retrieve top_k documents in the specified mode (dense, sparse, cascade, or rrf)."""
+        dense_query_embedding, sparse_query_embedding = self._embed_query(query)
+        # cascade is sparse prefetch first, then dense reranking
         if mode == "cascade":
             result = self.client.query_points(
                 collection_name=collection_name,
@@ -126,6 +116,7 @@ class VectorDBClient:
                 limit=top_k,
                 with_payload=True,
             )
+        # full dense retrieval
         elif mode == "dense":
             result = self.client.query_points(
                 collection_name=collection_name,
@@ -134,6 +125,7 @@ class VectorDBClient:
                 limit=top_k,
                 with_payload=True,
             )
+        # full sparse retrieval
         elif mode == "sparse":
             result = self.client.query_points(
                 query=models.SparseVector(
@@ -145,6 +137,7 @@ class VectorDBClient:
                 collection_name=collection_name,
                 with_payload=True,
             )
+        # reciprocal rank fusion retrieval
         elif mode == "rrf":
             result = self.client.query_points(
                 prefetch=[
@@ -160,7 +153,7 @@ class VectorDBClient:
                         query=dense_query_embedding,
                         using="dense",
                         limit=prefetch_limit,
-                    )
+                    ),
                 ],
                 query=models.FusionQuery(fusion=models.Fusion.RRF),
                 limit=top_k,

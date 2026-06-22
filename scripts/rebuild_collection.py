@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 
 def main():
+    """Deletes, recreates, then upserts the documents to Qdrant cloud vector database."""
     load_dotenv()
     print("Rebuilding collection (delete + recreate + upsert)...")
     points = load_jsonl(ArxivDocument, paths.RAW_DATA / "arxiv_data_cache.jsonl")

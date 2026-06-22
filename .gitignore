@@ -18,3 +18,14 @@ data/
 repomix-output.xml
 
 qdrant_storage
+testing.py
+
+scratch
+
+testing.ipynb
+
+control_panel.ipynb
+
+scripts/overlap.py
+scripts/retrieval_check.py
+scripts/validate_ground_truth.py
