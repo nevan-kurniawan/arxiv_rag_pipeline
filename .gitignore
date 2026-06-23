@@ -29,3 +29,5 @@ control_panel.ipynb
 scripts/overlap.py
 scripts/retrieval_check.py
 scripts/validate_ground_truth.py
+
+checkpaperdate*

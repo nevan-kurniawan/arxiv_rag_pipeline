@@ -9,7 +9,7 @@ pinned: false
 
 # Arxiv Research Assistant
 
-ArXiv Research Assistant is an end-to-end RAG pipeline that synthesizes recent deep learning research from ArXiv into conversational answers. It uses reciprocal rank fusion (RRF) over a vector database, with a full evaluation harness measuring retrieval quality and answer faithfulness + relevance. At present, it contains 1000 arxiv papers from {date} to {date}.
+ArXiv Research Assistant is an end-to-end RAG pipeline that synthesizes recent deep learning research from ArXiv into conversational answers. It uses reciprocal rank fusion (RRF) over a vector database, with a full evaluation harness measuring retrieval quality and answer faithfulness + relevance. At present, it contains 1000 arxiv papers between 2026-06-11 and 2026-06-17.
 
 The project includes a four-mode retrieval ablation study comparing dense, sparse, cascade, and reciprocal rank fusion (RRF) retrieval across five top-k settings, plus an LLM-as-judge evaluation measuring answer faithfulness and relevance.
 
@@ -27,7 +27,7 @@ The project includes a four-mode retrieval ablation study comparing dense, spars
 
 ## Architecture
 
-- **Data source:** arXiv API (cs.AI, last 30 days, up to 1,000 papers)
+- **Data source:** arXiv API (cs.AI, up to 1,000 most recently submitted papers.)
 - **Vector database:** Qdrant Cloud with hybrid dense (jina-embeddings-v2-small-en) + sparse (BM25) indexing
 - **Retrieval:** Serving uses RRF (Reciprocal Rank Fusion) at top-k=3. Experiment uses four modes: dense-only, sparse-only, cascade (sparse prefetch -> dense rerank), and RRF.
 - **Generation:** Groq-hosted LLMs via an OpenAI-compatible client with exponential-backoff retry on rate limits

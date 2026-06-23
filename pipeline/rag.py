@@ -4,10 +4,10 @@ from qdrant_client.models import QueryResponse
 
 
 def build_prompt(query_results: QueryResponse, query: str) -> str:
-    """Prompt builder for LLM query. Takes in the retrieved documents from the Qdrant client, the query, and returns the final prompt to be sentto the LLM."""
+    """Prompt builder for LLM query. Takes in the retrieved documents from the Qdrant client, the query, and returns the final prompt to be sent to the LLM."""
     system_prompt = (
         "You are a chatbot designed to synthesize and summarize the results of a search "
-        "on the Arxiv database of papers in the last 30 days based on the user's queries. "
+        "on the Arxiv database of recent papers in the cs.AI category based on the user's queries. "
         f"QUERY: {query}\n\n"
         "Based on the query, the search returned these documents that might be relevant. Review the following retrieved documents carefully:\n\n"
     )
